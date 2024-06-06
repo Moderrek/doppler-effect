@@ -5,12 +5,14 @@
 #include "raylib.h"
 #include "raymath.h"
 
+// Display
 #define SCREEN_WIDTH 800
 #define SCREEN_HEIGHT 600
-#define SOUND_SPEED 340.0f
-#define WAVE_COUNT 500
 #define PIXELS_PER_METER 3
-
+// Waves
+#define SOUND_SPEED 340.0f
+#define MAX_WAVE_COUNT 500
+// Audio
 #define MAX_SAMPLES 512
 #define MAX_SAMPLES_PER_UPDATE 4096
 
@@ -41,11 +43,9 @@ float sound_frequency_queue = 0.0f;
 float sineIdx = 0.0f;
 float volume = 1.0f;
 
-void AudioInputCallback(void* buffer, const unsigned int frames) {
-  short* data = buffer;
-
+void AudioInputCallback(void *buffer, const unsigned int frames) {
+  short *data = buffer;
   const float incr = sound_frequency / 48000.0f;
-
   for (unsigned int i = 0; i < frames; ++i) {
     data[i] = (short) (32000.0f * sinf(2 * PI * sineIdx));
     sineIdx += incr;
@@ -55,13 +55,13 @@ void AudioInputCallback(void* buffer, const unsigned int frames) {
 
 int main(void) {
   InitWindow(SCREEN_WIDTH, SCREEN_HEIGHT, "Doppler Effect - Moderr");
-  InitAudioDevice(); // Initialize audio device
+  InitAudioDevice();
   SetAudioStreamBufferSizeDefault(MAX_SAMPLES_PER_UPDATE);
 
   const AudioStream audio_stream = LoadAudioStream(48000, 16, 1);
   SetAudioStreamCallback(audio_stream, AudioInputCallback);
-  short* data = (short*) malloc(sizeof(short) * MAX_SAMPLES);
-  short* write_buffer = (short*) malloc(sizeof(short) * MAX_SAMPLES_PER_UPDATE);
+  short *data = (short *) malloc(sizeof(short) * MAX_SAMPLES);
+  short *write_buffer = (short *) malloc(sizeof(short) * MAX_SAMPLES_PER_UPDATE);
   PlayAudioStream(audio_stream);
 
   SoundSource source = {
@@ -75,8 +75,8 @@ int main(void) {
     (Vector2){0, 0},
   };
 
-  SoundWave sound_waves[WAVE_COUNT] = {0};
-  bool heard_waves[WAVE_COUNT] = {0};
+  SoundWave sound_waves[MAX_WAVE_COUNT] = {0};
+  bool heard_waves[MAX_WAVE_COUNT] = {0};
 
   SetTargetFPS(60);
 
@@ -88,8 +88,7 @@ int main(void) {
     timer += deltaTime;
     second_timer += deltaTime;
 
-    SetAudioStreamVolume(audio_stream, volume);
-
+    // Controls
     if (IsKeyDown(KEY_UP)) source.frequency += 1;
     if (IsKeyDown(KEY_DOWN)) source.frequency -= 1;
 
@@ -104,12 +103,14 @@ int main(void) {
     if (IsKeyDown(KEY_Z)) timeScale -= 0.1f;
     if (IsKeyDown(KEY_X)) timeScale += 0.1f;
 
-
+    // Move bodies
     source.position = Vector2Add(source.position, Vector2Multiply(source.velocity, (Vector2){deltaTime, deltaTime}));
-    observer.position = Vector2Add(observer.position, Vector2Multiply(observer.velocity, (Vector2){deltaTime, deltaTime}));
+    observer.position = Vector2Add(observer.position,
+                                   Vector2Multiply(observer.velocity, (Vector2){deltaTime, deltaTime}));
 
+    // Move sound waves
     const float d = SOUND_SPEED * deltaTime;
-    for (size_t i = 0; i < WAVE_COUNT; ++i) {
+    for (size_t i = 0; i < MAX_WAVE_COUNT; ++i) {
       if (!sound_waves[i].exists) continue;
       sound_waves[i].distance += d;
       if (sound_waves[i].distance > 800) {
@@ -117,12 +118,13 @@ int main(void) {
       }
     }
 
+    // Emit sound waves
     if (source.frequency == 0) {
       timer = 0;
     }
     if (timer > 1 / source.frequency) {
       timer -= 1 / source.frequency;
-      for (size_t i = 0; i < WAVE_COUNT; ++i) {
+      for (size_t i = 0; i < MAX_WAVE_COUNT; ++i) {
         if (sound_waves[i].exists) continue;
         sound_waves[i].distance = 0;
         sound_waves[i].source = source.position;
@@ -132,10 +134,8 @@ int main(void) {
       }
     }
 
-    size_t nearest = 0;
-    float nearest_distance = 0;
-    bool found_nearest = false;
-    for (size_t i = 0; i < WAVE_COUNT; ++i) {
+    // Update heard waves
+    for (size_t i = 0; i < MAX_WAVE_COUNT; ++i) {
       if (!sound_waves[i].exists) continue;
       const float distance = floor(Vector2Distance(sound_waves[i].source, observer.position));
       const float wave_r = floor(sound_waves[i].distance);
@@ -148,29 +148,18 @@ int main(void) {
         sound_frequency_queue++;
         sound_waves[i].color = RED;
         heard_waves[i] = true;
-        if (nearest_distance > wave_r) {
-          nearest_distance = wave_r;
-          nearest = i;
-          found_nearest = true;
-        }
       }
     }
 
-
+    // Update sound frequency
     if (second_timer > 0.1f) {
       second_timer -= 0.1f;
       // Every second
-
-      for (size_t i = 0; i < WAVE_COUNT; ++i) {
+      for (size_t i = 0; i < MAX_WAVE_COUNT; ++i) {
         heard_waves[i] = false;
       }
       sound_frequency = sound_frequency_queue * 10;
       sound_frequency_queue = 0;
-      if (found_nearest) {
-        volume = Clamp(1 / (4 * nearest), 0, 1);
-        SetAudioStreamVolume(audio_stream, volume);
-      }
-      printf("f = %f, v = %f", sound_frequency, volume);
     }
 
     // Update title
@@ -187,24 +176,23 @@ int main(void) {
     // Draw observer
     DrawCircleV(observer.position, meter(1), BLUE);
 
-    for (size_t i = 0; i < WAVE_COUNT; ++i) {
+    // Draw waves
+    for (size_t i = 0; i < MAX_WAVE_COUNT; ++i) {
       const SoundWave wave = sound_waves[i];
       if (!wave.exists) continue;
       DrawCircleLinesV(wave.source, meter(1 + (wave.distance / PI)), wave.color);
     }
-    // for (size_t i = 0; i < 10; ++i) {
-    //   DrawCircleLinesV(source.position, 10 + ((i + 1) * 10) + (elapsed * 10), BLACK);
-    // }
 
     EndDrawing();
   }
 
+  // Free audio stream
   free(data);
   free(write_buffer);
-
   UnloadAudioStream(audio_stream);
   CloseAudioDevice();
 
+  // Close OpenGL context
   CloseWindow();
   return 0;
 }
