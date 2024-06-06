@@ -1,5 +1,5 @@
 # [Doppler Effect](https://en.wikipedia.org/wiki/Doppler_effect) visualization
-Doppler effect simulation implemented in [C](https://pl.wikipedia.org/wiki/C_(j%C4%99zyk_programowania)) using [raylib](https://www.raylib.com/) for rendering
+Doppler effect simulation implemented in [C](https://en.wikipedia.org/wiki/C_(programming_language)) using [raylib](https://www.raylib.com/) for rendering
 
 # 📷 Screenshots
 ![Showcase](./images/doppler.gif)
